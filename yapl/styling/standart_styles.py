@@ -1,4 +1,4 @@
-from yapl.styling.StylingABC import LogStyle
+from yapl.styling.stylingABC import LogStyle
 
 STANDART_EVENT_TYPES = ["INFO", "DEBUG", "WARNING", "ERROR", "CRITICAL"]
 

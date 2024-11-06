@@ -2,7 +2,7 @@ from yapl.errors import LinkToSameDestinationError
 from yapl.styling.stylingABC import LogStyle
 from yapl.styling import standart_styles
 from yapl.datagens import get_caller_location, get_date_and_time
-from typing import Callable, Literal, Any
+from typing import Callable, Literal, Any, Optional
 
 
 class BaseLogger:
@@ -10,20 +10,33 @@ class BaseLogger:
     __logging_callback: Callable[[dict], None]
     __optional_data_gens: dict[str, Callable[[], Any]]
     style: LogStyle
+    init_callback: Optional[Callable]
+    del_callback: Optional[Callable]
 
     def __init__(
         self,
         logging_callback: Callable[[dict], None],
         log_destination: Literal["stdout"] | str | None = None,
         style: LogStyle = standart_styles.stdout,
+        init_callback: Optional[Callable] = None,
+        finish_callback: Optional[Callable] = None,
     ):
         self.__lgr_dst = log_destination
         self.__logging_callback = logging_callback
         self.style = style
         self.__optional_data_gens = {}
         if log_destination is not None and log_destination != "stdout":
-            f = open(log_destination, "w")
-            f.close()
+            self.__f = open(log_destination, "w")
+        self.init_callback = init_callback
+        self.finish_callback = finish_callback
+        if init_callback is not None:
+            init_callback(self)
+
+    def __del__(self):
+        if self.finish_callback is not None:
+            self.finish_callback(self)
+        if self.__lgr_dst is not None and self.__lgr_dst != "stdout":
+            self.__f.close()
 
     def __getattr__(self, name: str) -> Any:
         norm_name = name.upper()
@@ -37,22 +50,29 @@ class BaseLogger:
 
         return lg
 
+    def __log_stdout(self, string: str) -> None:
+        print(string)
+
+    def log_file(self, string: str) -> None:
+        self.__f.write(string)
+
     @property
     def optional_datagens(self) -> dict[str, Callable[[], Any]]:
         return self.__optional_data_gens
 
-    def __log_stdout(self, string: str) -> None:
-        print(string)
+    @property
+    def destination(self):
+        return self.__lgr_dst
 
     def log_json(self, json: dict) -> None:
         if self.__lgr_dst is None:
+            self.__logging_callback(json)
             return
         if self.__lgr_dst == "stdout":
             self.__log_stdout(self.style.to_format_string(json))
             return
-        f = open(self.__lgr_dst, "a")
-        f.write(self.style.to_format_string(json))
-        f.write("\n")
+        self.__f.write(self.style.to_format_string(json))
+        self.__f.write("\n")
 
     def log(self, evt_type: str, msg: str) -> None:
         log_obj = {"event_type": evt_type, "message": msg}
@@ -65,58 +85,67 @@ class BaseLogger:
         # log_obj["location"] = self.__get_caller_location()
         # log_obj.update(date_and_time)
         self.__logging_callback(log_obj)
+        if self.__lgr_dst is None:
+            return
         self.log_json(log_obj)
-
-    @property
-    def destination(self):
-        return self.__lgr_dst
 
 
 class LoggerContainer:
     __passive_loggers: list[BaseLogger]
-    __active_loggers: list[BaseLogger]
+    __active_loggers: dict[str | Callable, BaseLogger]
     __optional_data_gens: dict[str, Callable[[], Any]]
 
     def __init__(self):
         self.__passive_loggers = []
-        self.__active_loggers = []
+        self.__active_loggers = {}
         self.__optional_data_gens = {}
 
-    def __call__(self):
-        self.__passive_loggers.append(BaseLogger(self.__gen_logger_callback()))
+    def __call__(self, **kwargs):
+        std_cb = self.__gen_logger_callback()
+        if "logging_callback" in kwargs:
+            old_cb = kwargs["logging_callback"]
+
+            def new_cb(json):
+                std_cb(json)
+                old_cb(json)
+
+            kwargs["logging_callback"] = new_cb
+        else:
+            kwargs["logging_callback"] = std_cb
+        self.__passive_loggers.append(BaseLogger(**kwargs))
         self.__passive_loggers[-1].optional_datagens.update(self.__optional_data_gens)
         return self.__passive_loggers[-1]
 
     def __gen_logger_callback(self):
         def lgr_cb(json: dict) -> None:
             for lgr in self.__active_loggers:
-                lgr.log_json(json)
+                self.__active_loggers[lgr].log_json(json)
 
         return lgr_cb
 
     def add_log_destination(
         self,
         destination: Literal["stdout"] | str | Callable[[dict], None],
-        style: LogStyle,
+        style: Optional[LogStyle] = None,
+        **kwargs,
     ):
-        for logger in self.__active_loggers:
-            if logger.destination == destination:
-                raise LinkToSameDestinationError(
-                    f"Logger, that linked to destination: '{destination}' already exists"
-                )
+        if destination in self.__active_loggers:
+            raise LinkToSameDestinationError(
+                f"Logger, that linked to destination: '{destination}' already exists"
+            )
         cb = lambda x: None
         dst = destination
         if isinstance(dst, Callable):
             cb = dst  # type: Callable[[dict], None]
             dst = None
-        self.__active_loggers.append(BaseLogger(cb, dst, style))
+        if style is not None:
+            kwargs["style"] = style
+        self.__active_loggers[destination] = BaseLogger(cb, dst, **kwargs)
 
     def update_style(
         self, dst: Literal["stdout"] | str | Callable[[dict], None], new_style: LogStyle
     ):
-        for lgr in self.__active_loggers:
-            if lgr.destination == dst:
-                lgr.style = new_style
+        self.__active_loggers[dst].style = new_style
 
     def update_optional_datagens(self, key: str, datagen: Callable[[], Any]) -> None:
         self.__optional_data_gens[key] = datagen
