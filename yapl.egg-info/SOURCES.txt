@@ -1,9 +1,0 @@
-README.md
-setup.py
-yapl/Logger.py
-yapl/__init__.py
-yapl/errors.py
-yapl.egg-info/PKG-INFO
-yapl.egg-info/SOURCES.txt
-yapl.egg-info/dependency_links.txt
-yapl.egg-info/top_level.txt
