@@ -33,13 +33,14 @@ stdout = LogStyle(
         "message": "{EVENT_TYPE_msg_style_modifier}{message}\x1b[0m",
     },
     STDOUT_STANDART_MODIFIERS,
-    STANDART_EVENT_TYPES,
 )
 stdout_simple = LogStyle(
     "{event}{message}",
-    {"event": "[{event_type}]:", "message": "{message}"},
+    {
+        "event": "[{EVENT_TYPE_style_modifier}{event_type}\x1b[0m]:",
+        "message": "{EVENT_TYPE_msg_style_modifier}{message}\x1b[0m",
+    },
     STDOUT_STANDART_MODIFIERS,
-    STANDART_EVENT_TYPES,
 )
 file = LogStyle(
     "{date}{location}{event}{message}",
@@ -50,8 +51,8 @@ file = LogStyle(
         "message": "{message}",
     },
     FILE_STANDART_MODIFIERS,
-    STANDART_EVENT_TYPES,
 )
+none_style = LogStyle("", {}, {})
 if __name__ == "__main__":
     from datetime import datetime
 

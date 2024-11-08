@@ -11,7 +11,8 @@ class LogStyleABC(ABC):
         log_str: str,
         log_str_parts: dict[str, str],
         modifiers: dict,
-        event_types: list[str],
+        initial_str: str = "",
+        final_str: str = "",
     ): ...
     @abstractmethod
     def to_format_string(self, json_log: dict) -> str: ...
@@ -21,22 +22,25 @@ class LogStyle(LogStyleABC):
     __log_str: str
     __log_str_parts: dict[str, str]
     __modifiers: dict[str, dict[str, str]]
-    __event_types: list[str] | Literal["any"]
     __template_keys: dict[str, list[str | tuple[str, str]]]
     skip_modifiers: bool = True
+    initial_string: str
+    final_string: str
 
     def __init__(
         self,
         log_str: str,
         log_str_parts: dict[str, str],
         modifiers: dict,
-        event_types: list[str] | Literal["any"],
+        initial_str: str = "",
+        final_str: str = "",
     ) -> None:
         self.__log_str = log_str
         self.__log_str_parts = log_str_parts
-        self.__event_types = event_types
         self.__template_keys = {}
         self.__modifiers = {}
+        self.initial_string = initial_str
+        self.final_string = final_str
         for lsp_key in self.__log_str_parts:
             self.__template_keys[lsp_key] = [
                 i[1]
@@ -115,8 +119,3 @@ class LogStyle(LogStyleABC):
                     **ins_dct
                 ) + ("" if i == len(self.__template_keys) - 1 else " ")
         return self.__log_str.format(**out_dct)
-
-    def is_event(self, st: str) -> bool:
-        if self.__event_types == "any":
-            return True
-        return st in self.__event_types
