@@ -6,6 +6,7 @@ from yapl.sticky.strs import StickyString
 from typing import Callable, Literal, Any, Optional
 from abc import ABC, abstractmethod
 from io import TextIOWrapper
+import sys
 import os
 
 
@@ -87,6 +88,8 @@ class BaseLogger(ABC):
 class ConsoleLogger(BaseLogger):
     __log_destination: Literal["stdout"]
     __sticky_strings: list[StickyString]
+    __s_str_is_terminal_dirty: bool = False
+    __s_str_deleted_amount: int = 0
 
     def __init__(
         self,
@@ -112,21 +115,29 @@ class ConsoleLogger(BaseLogger):
     def rem_sticky_strings(self, s_str: StickyString) -> None:
         try:
             self.__sticky_strings.remove(s_str)
+            self.__s_str_deleted_amount += 1
         except ValueError:
             return
 
     def log_raw(self, raw_msg) -> None:
-        terminal_width = os.get_terminal_size().columns
-        padding_size = terminal_width - (len(raw_msg) % terminal_width)
-        self.__internal_log_raw(raw_msg + " " * padding_size + "\n")
+        if self.__s_str_is_terminal_dirty:
+            self.__clean_sticky()
+        self.__internal_log_raw(raw_msg + "\n")
         self.__log_sticky()
+
+    def __clean_sticky(self) -> None:
+        for _ in range(len(self.__sticky_strings) + self.__s_str_deleted_amount):
+            self.__s_str_deleted_amount = 0
+            self.__s_str_is_terminal_dirty = False
+            sys.stdout.write("\x1b[1A\x1b[2K")
 
     def __log_sticky(self) -> None:
         for s_str in self.__sticky_strings:
-            print(s_str.summary_string)
+            self.__s_str_is_terminal_dirty = True
+            sys.stdout.write(s_str.summary_string + "\n")
 
     def __internal_log_raw(self, raw_msg) -> None:
-        print(raw_msg, end="")
+        sys.stdout.write(raw_msg)
 
 
 class FileLogger(BaseLogger):

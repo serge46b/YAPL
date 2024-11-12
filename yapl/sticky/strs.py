@@ -46,9 +46,9 @@ class WidthNormilizedString:
             return self.__string[self.string_shift : end_idx]
 
         if self.align == "center":
-            padding = " " * ((len(self.__string) - self.width) // 2)
+            padding = " " * ((self.width - len(self.__string)) // 2)
             return padding + self.__string + padding
-        padding = " " * (len(self.__string) - self.width)
+        padding = " " * (self.width - len(self.__string))
         if self.align == "left":
             return self.__string + padding
         return padding + self.__string
@@ -102,6 +102,15 @@ class StickyString:
         # TODO: remake auto size section, so it tries to optimize space by size of the strings
         for as_wn_str in auto_sized_strs:
             as_wn_str.width = width_left // 3
+
+    def update_str(
+        self, str_idx: int, new_str: str, params: Optional[dict] = None
+    ) -> None:
+        self.__wn_strs[str_idx].string = new_str
+        if params is None:
+            return
+        for key in params:
+            setattr(self.__wn_strs[str_idx], key, params[key])
 
     @property
     def summary_string(self) -> str:
