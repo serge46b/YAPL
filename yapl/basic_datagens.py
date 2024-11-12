@@ -3,7 +3,7 @@ import inspect
 
 
 def get_caller_location() -> str:
-    caller_frame = inspect.stack()[3]
+    caller_frame = inspect.stack()[4]
     return caller_frame.filename.replace("\\", "/")
 
 
