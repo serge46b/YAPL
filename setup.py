@@ -14,6 +14,6 @@ setup(
     description="Yet Another Python Logger - module that helps you ",
     author="Serge46b",
     author_email="serg46b@gmail.com",
-    packages=["yapl"],
+    packages=["yapl", "yapl.sticky", "yapl.styling"],
     install_requires=requirements,
 )

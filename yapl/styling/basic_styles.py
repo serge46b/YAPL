@@ -1,6 +1,6 @@
-from yapl.styling.stylingABC import LogStyle
+from .stylingABC import LogStyle
 
-STANDART_EVENT_TYPES = ["INFO", "DEBUG", "WARNING", "ERROR", "CRITICAL"]
+STANDART_EVENT_TYPES = ["DEBUG", "WARNING", "ERROR", "INFO", "CRITICAL"]
 
 STDOUT_STANDART_MODIFIERS = {
     "EVENT_TYPE_modifiers": {
@@ -24,10 +24,19 @@ STDOUT_STANDART_MODIFIERS = {
 FILE_STANDART_MODIFIERS = {}
 
 
-stdout = LogStyle(
+stdout_full_info = LogStyle(
     "{date}{location}{event}{message}",
     {
         "date": "{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}.{microsecond}|",
+        "location": "\x1b[1m<{location}>\x1b[0m",
+        "event": "[{EVENT_TYPE_style_modifier}{event_type}\x1b[0m]:",
+        "message": "{EVENT_TYPE_msg_style_modifier}{message}\x1b[0m",
+    },
+    STDOUT_STANDART_MODIFIERS,
+)
+stdout = LogStyle(
+    "{location}{event}{message}",
+    {
         "location": "\x1b[1m<{location}>\x1b[0m",
         "event": "[{EVENT_TYPE_style_modifier}{event_type}\x1b[0m]:",
         "message": "{EVENT_TYPE_msg_style_modifier}{message}\x1b[0m",
@@ -65,7 +74,7 @@ if __name__ == "__main__":
     date_and_time["second"] = datetime.now().second
     date_and_time["microsecond"] = datetime.now().microsecond
     print(
-        stdout.to_format_string(
+        stdout_full_info.to_format_string(
             {
                 "location": "main.py",
                 "event_type": "INFO",
