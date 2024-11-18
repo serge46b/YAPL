@@ -1,3 +1,5 @@
 .*
-yapl.egg-info
+build
+*.egg-info
+*.pyc
 __pycache__

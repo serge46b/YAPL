@@ -1,8 +1,8 @@
-from yapl.errors import LinkToSameDestinationError
-from yapl.styling.stylingABC import LogStyle
-from yapl.styling import basic_styles
-from yapl.basic_datagens import get_caller_location, get_date_and_time
-from yapl.sticky.strs import StickyString
+from .basic_datagens import get_caller_location, get_date_and_time
+from .errors import LinkToSameDestinationError
+from .styling.stylingABC import LogStyle
+from .styling import basic_styles
+from .sticky.strs import StickyString
 from typing import Callable, Literal, Any, Optional
 from abc import ABC, abstractmethod
 from io import TextIOWrapper
@@ -14,6 +14,8 @@ class BaseLogger(ABC):
     __log_destination: Literal["stdout"] | str | None
     __optional_data_gens: dict[str, Callable[[], Any]]
     event_types: list[str] | Literal["any"]
+    verbosity_levels: dict[str, int]
+    verbosity: int
     logging_callback: Optional[Callable[..., Any]]
     style: LogStyle
     initial_callback: Optional[Callable[..., Any]]
@@ -24,6 +26,8 @@ class BaseLogger(ABC):
         log_destination: Literal["stdout"] | str | None,
         style: LogStyle,
         event_list: list[str] | Literal["any"],
+        verbosity_levels: Optional[dict[str, int]] = None,
+        verbosity: Optional[int] = None,
         logging_callback: Optional[Callable[..., Any]] = None,
         ininial_callback: Optional[Callable[..., Any]] = None,
         destruction_callback: Optional[Callable[..., Any]] = None,
@@ -31,6 +35,8 @@ class BaseLogger(ABC):
         self.__log_destination = log_destination
         self.__optional_data_gens = {}
         self.event_types = event_list
+        self.verbosity_levels = {} if verbosity_levels is None else verbosity_levels
+        self.verbosity = len(event_list) if verbosity is None else verbosity
         self.style = style
         self.logging_callback = logging_callback
         self.initial_callback = ininial_callback
@@ -47,14 +53,14 @@ class BaseLogger(ABC):
             self.destruction_callback()
 
     def __getattr__(self, name: str) -> Any:
-        norm_name = name.upper()
+        norm_name = name.upper().replace("_", " ")
         if self.event_types != "any" and norm_name not in self.event_types:
             raise AttributeError(
                 f"'{BaseLogger.__name__}' object has no attribute '{name}'"
             )
 
-        def lg(msg: str):
-            self.log_message(norm_name, msg)
+        def lg(msg: str, verbosity_level: Optional[int] = None):
+            self.log_message(norm_name, msg, verbosity_level)
 
         return lg
 
@@ -71,7 +77,19 @@ class BaseLogger(ABC):
         if self.logging_callback:
             self.logging_callback(json)
 
-    def log_message(self, evt_type: str, msg: str) -> None:
+    def log_message(
+        self, evt_type: str, msg: str, verbosity_level: Optional[int] = None
+    ) -> None:
+        v_l = verbosity_level
+        if not v_l:
+            try:
+                v_l = self.verbosity_levels[evt_type]
+            except:
+                v_l = 0
+                if type(self.event_types) == list:
+                    v_l = len(self.event_types) - self.event_types.index(evt_type) - 1
+        if v_l > self.verbosity:
+            return
         log_obj = {"event_type": evt_type, "message": msg}
         for key in self.__optional_data_gens:
             val = self.__optional_data_gens[key]()
@@ -103,9 +121,9 @@ class ConsoleLogger(BaseLogger):
             "stdout",
             style,
             event_list,
-            logging_callback,
-            ininial_callback,
-            destruction_callback,
+            logging_callback=logging_callback,
+            ininial_callback=ininial_callback,
+            destruction_callback=destruction_callback,
         )
         self.__sticky_strings = []
 
@@ -123,6 +141,11 @@ class ConsoleLogger(BaseLogger):
         if self.__s_str_is_terminal_dirty:
             self.__clean_sticky()
         self.__internal_log_raw(raw_msg + "\n")
+        self.__log_sticky()
+
+    def update_sticky(self) -> None:
+        if self.__s_str_is_terminal_dirty:
+            self.__clean_sticky()
         self.__log_sticky()
 
     def __clean_sticky(self) -> None:
@@ -157,9 +180,9 @@ class FileLogger(BaseLogger):
             log_destination,
             style,
             event_list,
-            logging_callback,
-            ininial_callback,
-            destruction_callback,
+            logging_callback=logging_callback,
+            ininial_callback=ininial_callback,
+            destruction_callback=destruction_callback,
         )
         self.__file = open(log_destination, "w")
 
@@ -189,9 +212,9 @@ class FunctionLogger(BaseLogger):
                 None,
                 style,
                 event_list,
-                logging_callback,
-                ininial_callback,
-                destruction_callback,
+                logging_callback=logging_callback,
+                ininial_callback=ininial_callback,
+                destruction_callback=destruction_callback,
             )
             return
         self.__log_destination = logging_callback
@@ -211,7 +234,7 @@ class FunctionLogger(BaseLogger):
 
 class ContaineredLogger:
     __active_loggers: dict[str | Callable, ConsoleLogger | FileLogger | FunctionLogger]
-    event_types: list[str] | Literal["any"]
+    __event_types: list[str] | Literal["any"]
 
     def __init__(
         self,
@@ -221,14 +244,14 @@ class ContaineredLogger:
         event_types: list[str] | Literal["any"],
     ) -> None:
         self.__active_loggers = active_loggers
-        self.event_types = event_types
+        self.__event_types = event_types
 
     def __getitem__(self, key: str) -> ConsoleLogger | FileLogger | FunctionLogger:
         return self.__active_loggers[key]
 
     def __getattr__(self, name: str) -> Any:
-        norm_name = name.upper()
-        if self.event_types != "any" and norm_name not in self.event_types:
+        norm_name = name.upper().replace("_", " ")
+        if self.__event_types != "any" and norm_name not in self.__event_types:
             raise AttributeError(
                 f"'{ContaineredLogger.__name__}' object has no attribute '{name}'"
             )
@@ -237,6 +260,12 @@ class ContaineredLogger:
             self.log_message(norm_name, msg)
 
         return lg
+
+    @property
+    def event_types(self) -> list[str] | Literal["any"]:
+        if type(self.__event_types) == list:
+            return self.__event_types.copy()
+        return self.__event_types
 
     def log_message(self, evt_type: str, msg: str) -> None:
         for lgr in self.__active_loggers.values():
@@ -248,12 +277,14 @@ class LoggerContainer:
     __active_loggers: dict[str | Callable, ConsoleLogger | FileLogger | FunctionLogger]
     __event_types_list: list[str] | Literal["any"]
     __optional_data_gens: dict[str, Callable[[], Any]]
+    __verbosity: Optional[int] = None
 
     def __init__(self):
         self.__passive_loggers = []
         self.__active_loggers = {}
         self.__optional_data_gens = {}
         self.__event_types_list = basic_styles.STANDART_EVENT_TYPES
+        # self.__verbosity = len(self.__event_types_list)
 
     def __call__(self):
         self.__passive_loggers.append(
@@ -263,6 +294,24 @@ class LoggerContainer:
 
     def __getitem__(self, key: str) -> ConsoleLogger | FileLogger | FunctionLogger:
         return self.__active_loggers[key]
+
+    @property
+    def event_types(self) -> list[str] | Literal["any"]:
+        if type(self.__event_types_list) == list:
+            return self.__event_types_list.copy()
+        return self.__event_types_list
+
+    @property
+    def verbosity(self) -> int:
+        if self.__verbosity is None:
+            return len(self.__event_types_list)
+        return self.__verbosity
+
+    @verbosity.setter
+    def verbosity(self, new_verbosity: int) -> None:
+        self.__verbosity = new_verbosity
+        for lgr in self.__active_loggers.values():
+            lgr.verbosity = new_verbosity
 
     def add_log_destination(
         self,
@@ -310,12 +359,20 @@ class LoggerContainer:
     ):
         self.__active_loggers[dst].style = new_style
 
-    def update_event_list(self, new_evt_list: list[str] | Literal["any"]) -> None:
+    def update_event_list(
+        self,
+        new_evt_list: list[str] | Literal["any"],
+        verbosity_levels: Optional[dict[str, int]] = None,
+    ) -> None:
         self.__event_types_list = new_evt_list
         for lgr in self.__passive_loggers:
-            lgr.event_types = self.__event_types_list
+            lgr.__event_types = self.__event_types_list
         for lgr in self.__active_loggers.values():
             lgr.event_types = self.__event_types_list
+            if verbosity_levels is not None:
+                lgr.verbosity_levels = verbosity_levels
+            if self.__verbosity is None:
+                lgr.verbosity = len(new_evt_list)
 
     def update_optional_datagens(self, name: str, datagen: Callable[[], Any]) -> None:
         self.__optional_data_gens[name] = datagen

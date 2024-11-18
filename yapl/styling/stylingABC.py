@@ -1,7 +1,6 @@
-from yapl.errors import StyleDictParseError
+from ..errors import StyleDictParseError
 from abc import ABC, abstractmethod
 from string import Formatter
-from typing import Literal
 
 
 class LogStyleABC(ABC):
