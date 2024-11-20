@@ -1,6 +1,7 @@
 from ..errors import StyleDictParseError
 from abc import ABC, abstractmethod
 from string import Formatter
+from typing import Callable
 
 
 class LogStyleABC(ABC):
@@ -21,6 +22,7 @@ class LogStyle(LogStyleABC):
     __log_str: str
     __log_str_parts: dict[str, str]
     __modifiers: dict[str, dict[str, str]]
+    __function_modifiers: dict[str, Callable[[str], str]]
     __template_keys: dict[str, list[str | tuple[str, str]]]
     skip_modifiers: bool = True
     initial_string: str
@@ -31,6 +33,7 @@ class LogStyle(LogStyleABC):
         log_str: str,
         log_str_parts: dict[str, str],
         modifiers: dict,
+        function_modifiers: dict[str, Callable[[str], str]] = {},
         initial_str: str = "",
         final_str: str = "",
     ) -> None:
@@ -38,6 +41,7 @@ class LogStyle(LogStyleABC):
         self.__log_str_parts = log_str_parts
         self.__template_keys = {}
         self.__modifiers = {}
+        self.__function_modifiers = function_modifiers
         self.initial_string = initial_str
         self.final_string = final_str
         for lsp_key in self.__log_str_parts:
@@ -102,6 +106,12 @@ class LogStyle(LogStyleABC):
                 if type(template_key) == str:
                     try:
                         ins_dct[template_key] = json_log[template_key]
+                        try:
+                            ins_dct[template_key] = self.__function_modifiers[
+                                template_key
+                            ](json_log[template_key])
+                        except KeyError:
+                            pass
                         continue
                     except KeyError:
                         break
@@ -109,6 +119,12 @@ class LogStyle(LogStyleABC):
                 mod = self.__modifiers[mandatory_key][key_name]
                 try:
                     ins_dct[key_name] = mod[json_log[dep_name]]
+                    try:
+                        ins_dct[key_name] = self.__function_modifiers[mandatory_key](
+                            ins_dct[key_name]
+                        )
+                    except KeyError:
+                        pass
                 except KeyError:
                     if not self.skip_modifiers:
                         break

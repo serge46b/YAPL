@@ -11,7 +11,7 @@ class GetCallerLocationClass:
         f_name_parts = f_name.split("/")
         if self.folder_depth > len(f_name_parts):
             return f_name
-        return " ".join(f_name_parts[self.folder_depth :])
+        return "/".join(f_name_parts[self.folder_depth :])
 
 
 get_caller_location = GetCallerLocationClass()
