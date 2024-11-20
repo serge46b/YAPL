@@ -75,6 +75,8 @@ def preprocess_msg(msg: str) -> str:
             and not s.isalpha()
             and st_idx != -1
         ):
+            if msg[i - 1] == "-":
+                continue
             ret_str += (
                 msg[l_w:st_idx]
                 + (
@@ -82,15 +84,17 @@ def preprocess_msg(msg: str) -> str:
                     if (msg[st_idx].isdigit() or msg[st_idx] == "-")
                     else "\x1b[38;5;5m"
                 )
-                + msg[st_idx : i + 1]
+                + msg[st_idx : i + s.isdigit()]
                 + "\x1b[0m"
+                + ("" if s.isdigit() else s)
             )
             l_w = i + 1
             st_idx = -1
             if s != " ":
                 is_between_spaces = False
-        if not (s.isupper() or (s.isdigit() or s == "-")) and s != " ":
+        if not (s.isupper() or s.isdigit()) and s != " ":
             is_between_spaces = False
+            st_idx = -1
     ret_str += msg[l_w:]
     return ret_str
 
