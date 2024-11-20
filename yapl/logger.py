@@ -81,7 +81,7 @@ class BaseLogger(ABC):
         self, evt_type: str, msg: str, verbosity_level: Optional[int] = None
     ) -> None:
         v_l = verbosity_level
-        if not v_l:
+        if v_l is None:
             try:
                 v_l = self.verbosity_levels[evt_type]
             except:
@@ -108,6 +108,7 @@ class ConsoleLogger(BaseLogger):
     __sticky_strings: list[StickyString]
     __s_str_is_terminal_dirty: bool = False
     __s_str_deleted_amount: int = 0
+    __s_str_added_amount: int = 0
 
     def __init__(
         self,
@@ -130,10 +131,10 @@ class ConsoleLogger(BaseLogger):
     def add_sticky_string(self, s_str: StickyString) -> None:
         self.__sticky_strings.append(s_str)
 
-    def rem_sticky_strings(self, s_str: StickyString) -> None:
+    def rem_sticky_strings(self, s_str: StickyString, leave_str: bool = False) -> None:
         try:
             self.__sticky_strings.remove(s_str)
-            self.__s_str_deleted_amount += 1
+            self.__s_str_deleted_amount += not leave_str
         except ValueError:
             return
 
@@ -149,9 +150,9 @@ class ConsoleLogger(BaseLogger):
         self.__log_sticky()
 
     def __clean_sticky(self) -> None:
+        self.__s_str_is_terminal_dirty = False
         for _ in range(len(self.__sticky_strings) + self.__s_str_deleted_amount):
             self.__s_str_deleted_amount = 0
-            self.__s_str_is_terminal_dirty = False
             sys.stdout.write("\x1b[1A\x1b[2K")
 
     def __log_sticky(self) -> None:

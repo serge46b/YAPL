@@ -101,7 +101,7 @@ class StickyString:
             auto_strs_sz += len(wn_str.string)
         # TODO: remake auto size section, so it tries to optimize space by size of the strings
         for as_wn_str in auto_sized_strs:
-            as_wn_str.width = width_left // 3
+            as_wn_str.width = width_left // len(auto_sized_strs)
 
     def update_str(
         self, str_idx: int, new_str: str, params: Optional[dict] = None
@@ -111,14 +111,15 @@ class StickyString:
             return
         for key in params:
             setattr(self.__wn_strs[str_idx], key, params[key])
+        self.__recalculate_widths()
 
     @property
     def summary_string(self) -> str:
+        self.__recalculate_widths()
         ret_str = ""
         for wn_str in self.__wn_strs:
             ret_str += wn_str.string
         term_width = os.get_terminal_size().columns
         if len(ret_str) > term_width:
             return ret_str[: term_width - 1]
-        ret_str += " " * (term_width - len(ret_str))
         return ret_str
