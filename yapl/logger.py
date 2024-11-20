@@ -366,7 +366,7 @@ class LoggerContainer:
     ) -> None:
         self.__event_types_list = new_evt_list
         for lgr in self.__passive_loggers:
-            lgr.__event_types = self.__event_types_list
+            lgr._ContaineredLogger__event_types = self.__event_types_list  # type: ignore
         for lgr in self.__active_loggers.values():
             lgr.event_types = self.__event_types_list
             if verbosity_levels is not None:

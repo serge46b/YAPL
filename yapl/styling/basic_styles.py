@@ -24,6 +24,77 @@ STDOUT_STANDART_MODIFIERS = {
 FILE_STANDART_MODIFIERS = {}
 
 
+def preprocess_msg(msg: str) -> str:
+    is_in_quote = False
+    is_in_brackets = False
+    is_between_spaces = False
+    st_idx = -1
+    l_w = 0
+    ret_str = ""
+    for i, s in enumerate(msg + "\0"):
+        if s == ")" and is_in_brackets:
+            is_in_brackets = False
+            ret_str += (
+                msg[l_w:st_idx] + "\x1b[38;5;8m" + msg[st_idx : i + 1] + "\x1b[0m"
+            )
+            l_w = i + 1
+            st_idx = -1
+            continue
+        if s == "'" and is_in_quote:
+            is_in_quote = False
+            ret_str += (
+                msg[l_w:st_idx] + "\x1b[38;5;2m" + msg[st_idx : i + 1] + "\x1b[0m"
+            )
+            l_w = i + 1
+            st_idx = -1
+            continue
+        if is_in_brackets or is_in_quote:
+            continue
+        if s == "(":
+            is_in_brackets = True
+            is_between_spaces = False
+            st_idx = i
+            continue
+        if s == "'":
+            is_in_quote = True
+            is_between_spaces = False
+            st_idx = i
+            continue
+        if s == " " and not is_between_spaces:
+            is_between_spaces = True
+            continue
+        if (
+            (s.isupper() or (s.isdigit() or s == "-"))
+            and is_between_spaces
+            and st_idx == -1
+        ):
+            st_idx = i
+            continue
+        if (
+            not (s.isupper() or (s.isdigit() or s == "-"))
+            and not s.isalpha()
+            and st_idx != -1
+        ):
+            ret_str += (
+                msg[l_w:st_idx]
+                + (
+                    "\x1b[38;5;6m"
+                    if (msg[st_idx].isdigit() or msg[st_idx] == "-")
+                    else "\x1b[38;5;5m"
+                )
+                + msg[st_idx : i + 1]
+                + "\x1b[0m"
+            )
+            l_w = i + 1
+            st_idx = -1
+            if s != " ":
+                is_between_spaces = False
+        if not (s.isupper() or (s.isdigit() or s == "-")) and s != " ":
+            is_between_spaces = False
+    ret_str += msg[l_w:]
+    return ret_str
+
+
 stdout_full_info = LogStyle(
     "{date}{location}{event}{message}",
     {
@@ -33,6 +104,7 @@ stdout_full_info = LogStyle(
         "message": "{EVENT_TYPE_msg_style_modifier}{message}\x1b[0m",
     },
     STDOUT_STANDART_MODIFIERS,
+    function_modifiers={"message": preprocess_msg},
 )
 stdout = LogStyle(
     "{location}{event}{message}",
@@ -42,6 +114,7 @@ stdout = LogStyle(
         "message": "{EVENT_TYPE_msg_style_modifier}{message}\x1b[0m",
     },
     STDOUT_STANDART_MODIFIERS,
+    function_modifiers={"message": preprocess_msg},
 )
 stdout_simple = LogStyle(
     "{event}{message}",
@@ -50,6 +123,7 @@ stdout_simple = LogStyle(
         "message": "{EVENT_TYPE_msg_style_modifier}{message}\x1b[0m",
     },
     STDOUT_STANDART_MODIFIERS,
+    function_modifiers={"message": preprocess_msg},
 )
 file = LogStyle(
     "{date}{location}{event}{message}",
