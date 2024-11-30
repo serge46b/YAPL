@@ -56,6 +56,8 @@ def preprocess_msg(msg: str) -> str:
             st_idx = i
             continue
         if s == "'":
+            if i != 0 and msg[i - 1].isalpha():
+                continue
             is_in_quote = True
             is_between_spaces = False
             st_idx = i
@@ -71,7 +73,10 @@ def preprocess_msg(msg: str) -> str:
             st_idx = i
             continue
         if (
-            not (s.isupper() or (s.isdigit() or s == "-"))
+            not (
+                s.isupper()
+                or (s.isdigit() or s == "-" or (s == "." and msg[st_idx].isdigit()))
+            )
             and not s.isalpha()
             and st_idx != -1
         ):
@@ -92,7 +97,7 @@ def preprocess_msg(msg: str) -> str:
             st_idx = -1
             if s != " ":
                 is_between_spaces = False
-        if not (s.isupper() or s.isdigit()) and s != " ":
+        if not (s.isupper() or (s.isdigit() or s == ".")) and s != " ":
             is_between_spaces = False
             st_idx = -1
     ret_str += msg[l_w:]

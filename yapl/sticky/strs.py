@@ -106,6 +106,8 @@ class StickyString:
     def update_str(
         self, str_idx: int, new_str: str, params: Optional[dict] = None
     ) -> None:
+        if self.__wn_strs[str_idx].string == new_str:
+            return
         self.__wn_strs[str_idx].string = new_str
         if params is None:
             return
