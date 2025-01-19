@@ -104,11 +104,11 @@ class BaseLogger(ABC):
 
 
 class ConsoleLogger(BaseLogger):
-    __log_destination: Literal["stdout"]
-    __sticky_strings: list[StickyString]
+    __sticky_strings: dict[str, StickyString]
     __s_str_is_terminal_dirty: bool = False
     __s_str_deleted_amount: int = 0
-    __s_str_added_amount: int = 0
+    __s_str_deleted: list[StickyString]
+    __s_str_order: list[str]
 
     def __init__(
         self,
@@ -126,15 +126,21 @@ class ConsoleLogger(BaseLogger):
             ininial_callback=ininial_callback,
             destruction_callback=destruction_callback,
         )
-        self.__sticky_strings = []
+        self.__sticky_strings = {}
+        self.__s_str_deleted = []
+        self.__s_str_order = []
 
-    def add_sticky_string(self, s_str: StickyString) -> None:
-        self.__sticky_strings.append(s_str)
+    def add_sticky_string(self, s_name: str, s_str: StickyString) -> None:
+        self.__sticky_strings[s_name] = s_str
+        self.__s_str_order.append(s_name)
 
-    def rem_sticky_strings(self, s_str: StickyString, leave_str: bool = False) -> None:
+    def rem_sticky_strings(self, s_name: str, leave_str: bool = False) -> None:
         try:
-            self.__sticky_strings.remove(s_str)
-            self.__s_str_deleted_amount += not leave_str
+            rem_str = self.__sticky_strings.pop(s_name)
+            if leave_str:
+                self.__s_str_deleted.append(rem_str)
+            self.__s_str_deleted_amount += 1
+            self.__s_str_order.remove(s_name)
         except ValueError:
             return
 
@@ -149,14 +155,22 @@ class ConsoleLogger(BaseLogger):
             self.__clean_sticky()
         self.__log_sticky()
 
+    @property
+    def sticky_strings(self) -> dict[str, StickyString]:
+        return self.__sticky_strings
+
     def __clean_sticky(self) -> None:
         self.__s_str_is_terminal_dirty = False
         for _ in range(len(self.__sticky_strings) + self.__s_str_deleted_amount):
             self.__s_str_deleted_amount = 0
             sys.stdout.write("\x1b[1A\x1b[2K")
+        for s_str in self.__s_str_deleted:
+            sys.stdout.write(s_str.summary_string + "\n")
+            self.__s_str_deleted = []
 
     def __log_sticky(self) -> None:
-        for s_str in self.__sticky_strings:
+        for s_name in self.__sticky_strings:
+            s_str = self.__sticky_strings[s_name]
             self.__s_str_is_terminal_dirty = True
             sys.stdout.write(s_str.summary_string + "\n")
 

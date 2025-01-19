@@ -97,7 +97,7 @@ class WidthNormilizedString:
     def string(self) -> str:
         if self.__cached_str is not None:
             return self.__cached_str
-        self.__string = self.__unformatted_str.format(**self.__str_variables)
+        self.__string = self.__string.format(**self.__str_variables)
         str_len = visible_length(self.__string)
         if str_len > self.__width:
             end_idx = self.__string_shift + self.__width
